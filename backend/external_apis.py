@@ -37,7 +37,7 @@ class ArxivClient:
     """HTTP client for arXiv API with rate limiting"""
     
     def __init__(self):
-        self.base_url = "http://export.arxiv.org/api/query"
+        self.base_url = "https://export.arxiv.org/api/query"
         self.rate_limit_seconds = settings.arxiv_rate_limit_seconds
         self.last_request_time = 0
         self.timeout = 10
@@ -58,7 +58,7 @@ class ArxivClient:
             try:
                 self._enforce_rate_limit()
                 
-                with httpx.Client(timeout=self.timeout) as client:
+                with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                     response = client.get(url, params=params)
                     
                     if response.status_code == 429:
@@ -91,14 +91,14 @@ class ArxivClient:
         
         raise Exception("Max retries exceeded")
     
-    def search_papers_by_date(self, date: date, category: str = None, max_results: int = 100) -> List[ArxivPaper]:
+    def search_papers_by_date(self, date: date, category: str = None, max_results: int = None) -> List[ArxivPaper]:
         """
-        Search for papers by submission date
+        Search for papers by submission date with automatic pagination to get ALL papers
         
         Args:
             date: The submission date to search for
             category: Optional category filter (e.g., 'cs.CL')
-            max_results: Maximum number of results to return
+            max_results: Maximum number of results to return (None = get all papers for the date)
             
         Returns:
             List of ArxivPaper objects
@@ -121,15 +121,51 @@ class ArxivClient:
         
         logger.info(f"Searching arXiv for papers on {date} with query: {search_query}")
         
-        try:
-            xml_response = self._make_request_with_retry(self.base_url, params)
-            papers = self.parse_arxiv_response(xml_response)
-            logger.info(f"Found {len(papers)} papers from arXiv for date {date}")
-            return papers
+        all_papers = []
+        start = 0
+        batch_size = 1000  # arXiv allows up to 2000, but 1000 is safer for reliability
+        
+        while True:
+            params = {
+                "search_query": search_query,
+                "start": start,
+                "max_results": batch_size,
+                "sortBy": "submittedDate", 
+                "sortOrder": "descending"
+            }
             
-        except Exception as e:
-            logger.error(f"Failed to search arXiv papers for date {date}: {e}")
-            raise
+            try:
+                xml_response = self._make_request_with_retry(self.base_url, params)
+                papers = self.parse_arxiv_response(xml_response)
+                
+                if not papers:
+                    # No more papers to fetch
+                    break
+                    
+                all_papers.extend(papers)
+                
+                # If we got fewer papers than requested, we've reached the end
+                if len(papers) < batch_size:
+                    break
+                    
+                # If user specified max_results and we've exceeded it, truncate and break
+                if max_results and len(all_papers) >= max_results:
+                    all_papers = all_papers[:max_results]
+                    break
+                    
+                start += batch_size
+                
+                # Log progress for long fetches
+                if len(all_papers) > 0 and len(all_papers) % 1000 == 0:
+                    logger.info(f"Progress: fetched {len(all_papers)} papers so far for {date}")
+                    
+            except Exception as e:
+                logger.error(f"Failed to search arXiv papers for date {date} at start={start}: {e}")
+                # Return what we have so far rather than failing completely
+                break
+        
+        logger.info(f"Found {len(all_papers)} total papers from arXiv for date {date}")
+        return all_papers
     
     def parse_arxiv_response(self, xml_response: str) -> List[ArxivPaper]:
         """
@@ -273,7 +309,7 @@ class SemanticScholarClient:
                 
                 headers = self._get_headers()
                 
-                with httpx.Client(timeout=self.timeout) as client:
+                with httpx.Client(timeout=self.timeout, follow_redirects=True) as client:
                     if method == "GET":
                         response = client.get(url, headers=headers)
                     elif method == "POST":
