@@ -1,103 +1,374 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useTodayPaper } from '@/lib/api/hooks';
+import { PaperCard } from '@/components/paper';
+import { ContentWrapper } from '@/components/layout/main-layout';
+import { Heading, Text, Button } from '@/components/ui';
+import { SkeletonCard } from '@/components/ui/skeleton';
+import { generatePaperStructuredData } from './metadata';
+import { 
+  CategorySelector, 
+  ShareModal, 
+  FavoriteButton 
+} from '@/components/features';
+import type { Paper } from '@/lib/api/types';
+
+/**
+ * Quick Actions Component with Interactive Features
+ */
+interface QuickActionsProps {
+  paper: Paper;
+}
+
+const QuickActions: React.FC<QuickActionsProps> = ({ paper }) => {
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+
+  const handleCategorySelect = (category: string | null) => {
+    setSelectedCategory(category);
+    if (category) {
+      window.location.href = `/categories/${category}`;
+    }
+  };
+
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
+    <div className="space-y-8 mt-12">
+      {/* Category Selection */}
+      <div className="max-w-md mx-auto">
+        <Text variant="body" className="text-center mb-4 text-slate-600">
+          Explore papers by category:
+        </Text>
+        <CategorySelector
+          categories={[]}
+          selectedCategory={selectedCategory || undefined}
+          onCategoryChange={handleCategorySelect}
+          placeholder="Choose a category to explore..."
+          showSearch={true}
+          className="w-full"
         />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+      </div>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
+      {/* Paper Actions */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+        <FavoriteButton 
+          paper={paper} 
+          variant="default"
+          showCount={false}
+        />
+        <Button 
+          variant="secondary" 
+          onClick={() => setShowShareModal(true)}
+          className="flex items-center gap-2"
         >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+          📤 Share This Paper
+        </Button>
+      </div>
+
+      {/* Navigation Links */}
+      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+        <Link href="/categories">
+          <Button variant="secondary" size="lg">
+            <span className="flex items-center gap-2">
+              🗂️ Browse by Category
+            </span>
+          </Button>
+        </Link>
+        <Link href="/history">
+          <Button variant="outline" size="lg">
+            <span className="flex items-center gap-2">
+              📚 View History
+            </span>
+          </Button>
+        </Link>
+      </div>
+
+      {/* Share Modal */}
+      <ShareModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        paper={paper}
+      />
     </div>
+  );
+};
+
+/**
+ * Error State Component
+ */
+interface ErrorStateProps {
+  error: Error;
+  onRetry: () => void;
+}
+
+const ErrorState: React.FC<ErrorStateProps> = ({ error, onRetry }) => {
+  const isNetworkError = error.message.includes('fetch') || error.message.includes('network');
+  
+  return (
+    <div className="text-center py-12">
+      <div className="max-w-md mx-auto">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg
+            className="w-8 h-8 text-red-600"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z"
+            />
+          </svg>
+        </div>
+        
+        <Heading level={2} variant="lg" className="mb-4 text-slate-900">
+          {isNetworkError ? 'Connection Problem' : 'Unable to Load Today&apos;s Paper'}
+        </Heading>
+        
+        <Text variant="body" className="text-slate-600 mb-6">
+          {isNetworkError 
+            ? 'Please check your internet connection and try again.'
+            : 'We encountered an issue while loading today&apos;s featured paper. Please try again in a moment.'
+          }
+        </Text>
+        
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button variant="primary" onClick={onRetry}>
+            Try Again
+          </Button>
+          <Link href="/categories">
+            <Button variant="secondary">Browse Categories</Button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Empty State Component (when no paper is found)
+ */
+const EmptyState: React.FC = () => {
+  return (
+    <div className="text-center py-12">
+      <div className="max-w-md mx-auto">
+        <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
+          <svg
+            className="w-8 h-8 text-slate-500"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            aria-hidden="true"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+        </div>
+        
+        <Heading level={2} variant="lg" className="mb-4 text-slate-900">
+          No Paper Found for Today
+        </Heading>
+        
+        <Text variant="body" className="text-slate-600 mb-6">
+          We couldn&apos;t find any historically significant papers published on this date. 
+          Check back tomorrow or explore papers by category.
+        </Text>
+        
+        <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Link href="/categories">
+            <Button variant="primary">Browse Categories</Button>
+          </Link>
+          <Link href="/history">
+            <Button variant="secondary">View History</Button>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * Page Title Component
+ */
+interface PageTitleProps {
+  featuredDate?: string;
+  isLoading?: boolean;
+}
+
+const PageTitle: React.FC<PageTitleProps> = ({ featuredDate, isLoading }) => {
+  const getPageTitle = (): string => {
+    if (isLoading) return 'Loading Today&apos;s Paper...';
+    
+    if (featuredDate) {
+      try {
+        const date = new Date(featuredDate);
+        const year = date.getFullYear();
+        const today = new Date();
+        const currentYear = today.getFullYear();
+        
+        if (year === currentYear) {
+          return `Today&apos;s Featured Paper`;
+        } else {
+          return `On this day in ${year}`;
+        }
+      } catch {
+        return 'Today&apos;s Featured Paper';
+      }
+    }
+    
+    return 'Today&apos;s Featured Paper';
+  };
+
+  return (
+    <div className="text-center mb-8">
+      <Heading level={1} variant="2xl" className="mb-4 text-slate-900">
+        📅 {getPageTitle()}
+      </Heading>
+      <Text variant="large" className="text-slate-600 max-w-2xl mx-auto">
+        Discover a historically significant academic paper published on this day in academic history.
+      </Text>
+    </div>
+  );
+};
+
+
+/**
+ * Main Home Page Component
+ */
+export default function HomePage() {
+  const { data, error, isLoading, mutate } = useTodayPaper();
+
+  const handleRetry = () => {
+    mutate();
+  };
+
+  // Update document title and add structured data when paper loads
+  useEffect(() => {
+    if (data?.paper) {
+      // Update document title
+      const year = new Date(data.featuredDate).getFullYear();
+      const title = year === new Date().getFullYear() 
+        ? `Today's Featured Paper | Paper Birthdays`
+        : `On this day in ${year} | Paper Birthdays`;
+      document.title = title;
+
+      // Add structured data
+      const structuredData = generatePaperStructuredData(data.paper);
+      
+      // Remove existing structured data script if it exists
+      const existingScript = document.querySelector('script[data-paper-structured-data]');
+      if (existingScript) {
+        existingScript.remove();
+      }
+
+      // Add new structured data script
+      const script = document.createElement('script');
+      script.type = 'application/ld+json';
+      script.setAttribute('data-paper-structured-data', 'true');
+      script.textContent = JSON.stringify(structuredData);
+      document.head.appendChild(script);
+
+      // Update meta description
+      const metaDescription = document.querySelector('meta[name="description"]');
+      if (metaDescription) {
+        const newDescription = `${data.paper.title} - A historically significant paper published on this day in ${year}. ${data.paper.abstract.substring(0, 100)}...`;
+        metaDescription.setAttribute('content', newDescription);
+      }
+    }
+  }, [data]);
+
+  // Cleanup structured data on unmount
+  useEffect(() => {
+    return () => {
+      const script = document.querySelector('script[data-paper-structured-data]');
+      if (script) {
+        script.remove();
+      }
+    };
+  }, []);
+
+  return (
+    <ContentWrapper maxWidth="lg" padding="lg">
+      {/* Page Title */}
+      <PageTitle 
+        featuredDate={data?.featuredDate} 
+        isLoading={isLoading} 
+      />
+
+      {/* Main Content */}
+      <div className="flex flex-col items-center">
+        {/* Loading State */}
+        {isLoading && (
+          <div className="w-full max-w-4xl">
+            <SkeletonCard className="mx-auto" />
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !isLoading && (
+          <ErrorState error={error} onRetry={handleRetry} />
+        )}
+
+        {/* Empty State */}
+        {!data && !error && !isLoading && (
+          <EmptyState />
+        )}
+
+        {/* Featured Paper */}
+        {data && !isLoading && (
+          <div className="w-full">
+            <PaperCard
+              paper={data.paper}
+              variant="featured"
+              featuredDate={data.featuredDate}
+              showShareButton={true}
+              showExternalLinks={true}
+              showAbstract={true}
+              className="mx-auto"
+            />
+          </div>
+        )}
+
+        {/* Interactive Actions */}
+        {data?.paper && <QuickActions paper={data.paper} />}
+      </div>
+
+      {/* Additional Information */}
+      <div className="mt-16 text-center">
+        <div className="max-w-3xl mx-auto">
+          <Heading level={2} variant="lg" className="mb-6 text-slate-900">
+            About Paper Birthdays
+          </Heading>
+          <div className="grid md:grid-cols-2 gap-8 text-left">
+            <div>
+              <Heading level={3} variant="lg" className="mb-3 text-slate-800">
+                📊 Citation-Based Selection
+              </Heading>
+              <Text variant="body" className="text-slate-600">
+                Papers are selected from the most cited research published on this day in previous years, 
+                using data from Semantic Scholar to identify historically significant work.
+              </Text>
+            </div>
+            <div>
+              <Heading level={3} variant="lg" className="mb-3 text-slate-800">
+                🎯 Daily Discovery
+              </Heading>
+              <Text variant="body" className="text-slate-600">
+                Each day features a different paper from arXiv&apos;s vast collection, helping you discover 
+                groundbreaking research that shaped various fields of study.
+              </Text>
+            </div>
+          </div>
+        </div>
+      </div>
+    </ContentWrapper>
   );
 }
