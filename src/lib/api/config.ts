@@ -59,7 +59,7 @@ class Config {
   }
 
   public getApiUrl(endpoint: string): string {
-    const baseUrl = this.api.baseUrl.replace(/\/$/, ''); // Remove trailing slash
+    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `${baseUrl}${cleanEndpoint}`;
   }
