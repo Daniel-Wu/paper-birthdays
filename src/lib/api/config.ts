@@ -25,7 +25,7 @@ class Config {
 
   private constructor() {
     this.api = {
-      baseUrl: this.getEnvVar('API_BASE_URL', 'http://localhost:8000'),
+      baseUrl: this.getApiBaseUrl(),
       timeout: parseInt(this.getEnvVar('API_TIMEOUT', '10000')),
       retries: parseInt(this.getEnvVar('API_RETRIES', '3')),
       retryDelay: parseInt(this.getEnvVar('API_RETRY_DELAY', '1000')),
@@ -58,8 +58,19 @@ class Config {
     }
   }
 
+  private getApiBaseUrl(): string {
+    // Handle both NEXT_PUBLIC_API_URL and NEXT_PUBLIC_API_BASE_URL for compatibility
+    if (typeof window === 'undefined') {
+      // Server-side
+      return process.env.NEXT_PUBLIC_API_URL || process.env.API_BASE_URL || 'http://localhost:8000';
+    } else {
+      // Client-side
+      return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    }
+  }
+
   public getApiUrl(endpoint: string): string {
-    const baseUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/$/, '');
+    const baseUrl = this.getApiBaseUrl().replace(/\/$/, '');
     const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `${baseUrl}${cleanEndpoint}`;
   }
